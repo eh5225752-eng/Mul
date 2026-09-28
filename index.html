@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Algoritmo de Booth interactivo</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#10161d;--panel:#182029;--panel2:#1e2731;--line:#2b3644;--ink:#e8eef3;--dim:#93a3b1;--cyan:#5fd8cf;--amber:#e8a35f;--green:#7fd39a;--mono:'IBM Plex Mono',monospace;--head:'Space Grotesk',sans-serif;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:light){:root:not([data-theme="light"]){--bg:#f4f6f8;--panel:#fff;--panel2:#eef1f4;--line:#d7dee4;--ink:#182029;--dim:#5a6b78}}
+:root[data-theme="dark"]{--bg:#10161d;--panel:#182029;--panel2:#1e2731;--line:#2b3644;--ink:#e8eef3;--dim:#93a3b1}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--head);line-height:1.55}
+.wrap{max-width:780px;margin:0 auto;padding:44px 18px 80px}
+h1{font-size:1.8rem;margin:0 0 6px}
+h2{font-size:1.2rem;margin:38px 0 12px}
+p{color:var(--dim);max-width:65ch;margin:6px 0}
+.sub{color:var(--cyan);margin:0 0 4px}
+.controls{display:flex;flex-wrap:wrap;gap:14px;margin-top:20px;padding:16px;background:var(--panel);border:1px solid var(--line);border-radius:10px}
+.controls label{display:flex;flex-direction:column;gap:5px;font-size:.85rem;color:var(--dim)}
+.controls input,.controls select{font-family:var(--mono);font-size:1.05rem;padding:8px 10px;width:130px;background:var(--panel2);color:var(--ink);border:1px solid var(--line);border-radius:6px}
+.controls input:focus,.controls select:focus{outline:2px solid var(--cyan)}
+.err{color:var(--amber);min-height:1.4em;margin-top:10px;font-size:.9rem}
+.chips{display:flex;gap:10px;flex-wrap:wrap;font-family:var(--mono);font-size:.95rem;margin-top:8px}
+.chip{background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:5px 11px;color:var(--dim)}
+.chip b{color:var(--ink)}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.9rem;background:var(--panel);border:1px solid var(--line)}
+th{background:var(--panel2);text-align:left;padding:9px 11px;color:var(--dim);font-weight:600;white-space:nowrap}
+td{padding:8px 11px;border-top:1px solid var(--line);white-space:nowrap}
+.resta{color:var(--amber)}.suma{color:var(--green)}.shift{color:var(--dim)}
+.card{border:1px solid var(--line);border-radius:10px;background:var(--panel);padding:18px 20px;margin-bottom:16px}
+.ch{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+.cn{font-family:var(--mono);font-size:.85rem;color:var(--cyan);border:1px solid var(--line);border-radius:5px;padding:2px 8px}
+.ct{font-weight:700}
+.b{font-family:var(--mono);background:var(--panel2);padding:1px 6px;border-radius:4px;color:var(--ink)}
+.arith{margin-top:12px;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:14px 16px;font-family:var(--mono);overflow-x:auto}
+.al{font-family:var(--head);color:var(--dim);font-size:.85rem;margin-bottom:8px}
+.g{display:grid;gap:3px;font-size:1.05rem;justify-content:start}
+.g span{text-align:center}
+.g .op{text-align:left;color:var(--dim)}
+.g .cy{color:var(--cyan);font-size:.75rem}
+.g .ln{grid-column:1/-1;border-top:1px solid var(--line);margin:4px 0}
+.g .ds{color:var(--amber);text-decoration:line-through}
+.an{color:var(--dim);font-family:var(--head);font-size:.85rem;margin-top:8px}
+.res{margin-top:34px;padding:20px;border-radius:10px;background:var(--panel2);border:1px solid var(--cyan)}
+.res .f{font-family:var(--mono);font-size:1.3rem;color:var(--cyan);word-break:break-all}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="sub">Algoritmo de Booth · multiplicación en complemento a 2</p>
+  <h1>Procedimiento paso a paso</h1>
+  <p>Cambia los valores y el número de bits; la tabla y el detalle de cada suma o resta se recalculan al instante.</p>
+
+  <div class="controls">
+    <label>Multiplicando (M)<input id="m" type="number" step="1" value="2" inputmode="numeric"></label>
+    <label>Multiplicador (m)<input id="q" type="number" step="1" value="6" inputmode="numeric"></label>
+    <label>Bits<select id="n"><option>4</option><option>5</option><option>6</option><option>8</option></select></label>
+  </div>
+  <div class="err" id="err" role="alert"></div>
+  <div id="out"></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+let n=4;
+const bits=x=>(x<0?x+2**n:x).toString(2).padStart(n,'0');
+const sg=s=>{const v=parseInt(s,2);return s[0]==='1'?v-2**s.length:v};
+const c2=s=>{const mask=2**n-1;return (((~parseInt(s,2))&mask)+1&mask).toString(2).padStart(n,'0')};
+function add(a,b){
+  const res=Array(n),co=Array(n);let c=0;
+  for(let i=n-1;i>=0;i--){const s=+a[i]+ +b[i]+c;res[i]=s%2;c=s>>1;co[i]=c}
+  return{res:res.join(''),co,cout:co[0]};
+}
+function arith(a,b,sym,label,note){
+  const r=add(a,b),cols=n+1;
+  const cell=(arr,cls='')=>arr.map(x=>`<span class="${cls}">${x}</span>`).join('');
+  const carry=[];for(let j=0;j<n;j++)carry.push(r.co[j]?1:'·');carry.push('');
+  return `<div class="arith"><div class="al">${label}</div>
+  <div class="g" style="grid-template-columns:22px repeat(${cols},26px)">
+    <span class="op"></span>${cell(carry,'cy')}
+    <span class="op"></span><span></span>${cell(a.split(''))}
+    <span class="op">${sym}</span><span></span>${cell(b.split(''))}
+    <div class="ln"></div>
+    <span class="op">=</span><span class="ds">${r.cout}</span>${cell(r.res.split(''))}
+  </div><div class="an">${note} Resultado: A = ${r.res}.${r.cout?' El acarreo final (tachado) se descarta por el límite de '+n+' bits.':''}</div></div>`;
+}
+function render(){
+  n=+$('n').value;
+  const M=parseInt($('m').value),Q=parseInt($('q').value),lo=-(2**(n-1)),hi=2**(n-1)-1;
+  if(isNaN(M)||isNaN(Q)||M<lo||M>hi||Q<lo||Q>hi){
+    $('err').textContent=`Ingresa enteros entre ${lo} y ${hi} (rango de ${n} bits en complemento a 2).`;$('out').innerHTML='';return;
+  }
+  $('err').textContent='';
+  const Mb=bits(M);let A='0'.repeat(n),q=bits(Q),qm='0';
+  const rows=[{c:'0',bp:'—',act:'Valores iniciales',cls:'',A,q,qm}],cards=[];
+  for(let i=1;i<=n;i++){
+    const pair=q[n-1]+qm;let Ap=A,op='',det='';
+    if(pair==='10'){
+      const neg=c2(Mb);op='resta';
+      det=arith(A,neg,'+',`Restar M equivale a sumar su complemento a 2: ${Mb} → invertido ${[...Mb].map(x=>1-x).join('')} → +1 → ${neg}`,'A − M = A + (−M).');
+      Ap=add(A,neg).res;
+    }else if(pair==='01'){
+      op='suma';det=arith(A,Mb,'+','Suma directa de A y M','A + M.');Ap=add(A,Mb).res;
+    }
+    if(op)rows.push({c:i,bp:pair[0]+','+pair[1],act:op==='resta'?'Se resta M a A':'Se suma M a A',cls:op,A:Ap,q,qm});
+    const nqm=q[n-1];q=Ap[n-1]+q.slice(0,n-1);A=Ap[0]+Ap.slice(0,n-1);qm=nqm;
+    rows.push({c:op?'':i,bp:op?'':pair[0]+','+pair[1],act:op?'Desplazamiento aritmético':'Solo se desplazan los bits',cls:'shift',A,q,qm});
+    const title=op==='resta'?'resta M a A':op==='suma'?'suma M a A':'sin operación';
+    const why=op?`Q0=${pair[0]} y Q-1=${pair[1]}: la regla indica <b>${op==='resta'?'A = A − M':'A = A + M'}</b>.`:`Q0 y Q-1 son iguales (${pair[0]},${pair[1]}): no se suma ni se resta.`;
+    cards.push(`<div class="card"><div class="ch"><span class="cn">Ciclo ${i}</span><span class="ct">Bits <span class="b">${pair[0]},${pair[1]}</span> → ${title}</span></div>
+    <p>${why}</p>${det}
+    <p>Desplazamiento aritmético a la derecha (A conserva el bit de signo): A = <span class="b">${A}</span>, m = <span class="b">${q}</span>, m-1 = <span class="b">${qm}</span>.</p></div>`);
+  }
+  const prod=A+q,val=sg(prod),ok=val===M*Q;
+  $('out').innerHTML=`
+  <div class="chips"><span class="chip">M = <b>${Mb}</b> (${M})</span><span class="chip">m = <b>${bits(Q)}</b> (${Q})</span><span class="chip">−M = <b>${c2(Mb)}</b></span></div>
+  <h2>Tabla completa</h2><div class="tw"><table><thead><tr><th>Ciclo</th><th>M</th><th>Bits</th><th>Acción</th><th>A</th><th>m</th><th>m-1</th></tr></thead><tbody>
+  ${rows.map(r=>`<tr><td>${r.c}</td><td>${Mb}</td><td>${r.bp}</td><td class="${r.cls}">${r.act}</td><td>${r.A}</td><td>${r.q}</td><td>${r.qm}</td></tr>`).join('')}
+  </tbody></table></div>
+  <h2>Detalle de cada ciclo</h2>${cards.join('')}
+  <div class="res"><h2 style="margin-top:0">Resultado final</h2><p>Se concatenan A y m:</p>
+  <p class="f">${A} ${q} = ${val}</p>
+  <p>Comprobación: ${M} × ${Q} = ${M*Q} ${ok?'✓':'✗'}</p></div>`;
+}
+['m','q','n'].forEach(id=>$(id).addEventListener('input',render));
+render();
+</script>
+</body>
+</html>
